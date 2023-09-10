@@ -33,8 +33,8 @@
             >
             <div class="mt-1 relative rounded-md shadow-md">
               <input
-                v-model="ticker"
-                v-on:keydown.enter="add(ticker)"
+                v-model="tickerName"
+                v-on:keydown.enter="add(tickerName)"
                 id="wallet"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                 name="wallet"
@@ -68,7 +68,7 @@
           </div>
         </div>
         <button
-          @click="add(ticker)"
+          @click="add(tickerName)"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           type="button"
         >
@@ -111,7 +111,7 @@
             </div>
             <div class="w-full border-ticker border-gray-200"></div>
             <button
-              @click.stop="remove(ticker)"
+              @click.stop="remove(ticker.name)"
               class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
             >
               <svg
@@ -152,14 +152,11 @@
         >
           <svg
             height="30"
-            style="enable-background: new 0 0 512 512"
             viewBox="0 0 511.76 511.76"
             width="30"
             x="0"
             xml:space="preserve"
             xmlns="http://www.w3.org/2000/svg"
-            xmlns:svgjs="http://svgjs.com/svgjs"
-            xmlns:xlink="http://www.w3.org/1999/xlink"
             y="0"
           >
             <g>
@@ -181,53 +178,60 @@ export default {
   name: "App",
   data() {
     return {
-      ticker: "",
+      tickerName: "",
       tickers: [],
       selected: null,
       graph: [],
+      intervalIds: new Map(),
     };
   },
   created() {
-    const tickersData = JSON.parse(localStorage.getItem("TICKERS"));
-    if (tickersData) {
-      this.tickers = tickersData;
-      tickersData.forEach((ticker) => this.subscribeToUpdates(ticker.name));
+    const savedTickers = JSON.parse(localStorage.getItem("TICKERS"));
+    if (savedTickers) {
+      this.tickers = savedTickers;
+      savedTickers.forEach((ticker) => this.subscribeToUpdates(ticker.name));
     }
   },
   methods: {
     subscribeToUpdates(tickerName) {
-      setInterval(async () => {
+      const intervalId = setInterval(async () => {
         const f = await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=b590b10b9658e433d22b9ab95e234b84cda3c4ed9b0ce21a5577b768d8143620`
         );
         const data = await f.json();
-        this.tickers.find((ticker) => ticker.name === tickerName).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        if (this.selected?.name === tickerName) {
-          this.graph.push(data.USD);
+        const ticker = this.tickers.find(
+          (ticker) => ticker.name === tickerName
+        );
+        if (ticker) {
+          ticker.price =
+            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+          if (this.selected?.name === tickerName) {
+            this.graph.push(data.USD);
+          }
         }
       }, 1000);
-      this.ticker = "";
+      this.intervalIds.set(tickerName, intervalId);
     },
-    add(ticker) {
-      if (!ticker) {
+    add(tickerName) {
+      if (!tickerName) {
         return;
       }
       const currentTicker = {
-        name: ticker.toUpperCase(),
+        name: tickerName.toUpperCase(),
         price: "-",
       };
 
-      if (this.tickers.find((t) => t.name === currentTicker.name)) {
-        this.warningIsShown = true;
-        return;
-      }
       this.tickers.push(currentTicker);
       localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
       this.subscribeToUpdates(currentTicker.name);
+      this.ticker = "";
     },
-    remove(ticker) {
-      this.tickers = this.tickers.filter((t) => t !== ticker);
+    remove(tickerName) {
+      this.tickers = this.tickers.filter(
+        (ticker) => ticker.name !== tickerName
+      );
+      clearInterval(this.intervalIds.get(tickerName));
+      localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
     },
     normalizeGraph() {
       const maxValue = Math.max(...this.graph);
