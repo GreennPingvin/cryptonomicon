@@ -44,27 +44,17 @@
             </div>
             <div class="flex bg-white shadow-md p-1 rounded-md flex-wrap">
               <span
+                v-for="(promptTickerName, i) in promptTickerNames"
+                :key="i"
+                @click="add(promptTickerName)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
+                {{ promptTickerName }}
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="warningIsShown" class="text-sm text-red-600">
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -183,6 +173,8 @@ export default {
       selected: null,
       graph: [],
       intervalIds: new Map(),
+      promptTickerNames: ["BTC", "DOGE", "BCH", "CHD"],
+      warningIsShown: false,
     };
   },
   created() {
@@ -221,6 +213,12 @@ export default {
         price: "-",
       };
 
+      if (this.isTickerNameInList(tickerName)) {
+        this.warningIsShown = true;
+        this.tickerName = tickerName;
+        return;
+      }
+
       this.tickers.push(currentTicker);
       localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
       this.subscribeToUpdates(currentTicker.name);
@@ -243,6 +241,9 @@ export default {
     select(ticker) {
       this.selected = ticker;
       this.graph = [];
+    },
+    isTickerNameInList(tickerName) {
+      return Boolean(this.tickers.find((ticker) => ticker.name === tickerName));
     },
   },
 };
