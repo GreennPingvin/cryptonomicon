@@ -78,12 +78,27 @@
           Добавить
         </button>
       </section>
-
+      <hr class="w-full border-t border-gray-600 my-4" />
       <template v-if="tickers.length > 0">
+        <button
+          v-if="page > 1"
+          @click="page = page - 1"
+          class="my-4 mx-1 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+        >
+          Назад
+        </button>
+        <button
+          v-if="hasNextPage"
+          @click="page = page + 1"
+          class="my-4 mx-1 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+        >
+          Вперед
+        </button>
+        <div>Фильтр: <input type="text" v-model="filter" /></div>
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="ticker of tickers"
+            v-for="ticker of filteredTickers()"
             :key="ticker.name"
             @click="select(ticker)"
             :class="{
@@ -175,9 +190,23 @@ export default {
       intervalIds: new Map(),
       promptTickerNames: ["BTC", "DOGE", "BCH", "CHD"],
       warningIsShown: false,
+      page: 1,
+      filter: "",
+      hasNextPage: false,
     };
   },
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
+
     const savedTickers = JSON.parse(localStorage.getItem("TICKERS"));
     if (savedTickers) {
       this.tickers = savedTickers;
@@ -213,16 +242,17 @@ export default {
         price: "-",
       };
 
-      if (this.isTickerNameInList(tickerName)) {
+      if (this.isTickerNameInList(currentTicker.name)) {
         this.warningIsShown = true;
         this.tickerName = tickerName;
         return;
       }
+      this.warningIsShown = false;
 
       this.tickers.push(currentTicker);
       localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
       this.subscribeToUpdates(currentTicker.name);
-      this.ticker = "";
+      this.filter = "";
     },
     remove(tickerName) {
       this.tickers = this.tickers.filter(
@@ -244,6 +274,33 @@ export default {
     },
     isTickerNameInList(tickerName) {
       return Boolean(this.tickers.find((ticker) => ticker.name === tickerName));
+    },
+    filteredTickers() {
+      const start = (this.page - 1) * 3;
+      const end = start + 3;
+      const filteredTickers = this.tickers.filter((ticker) =>
+        ticker.name.includes(this.filter.toUpperCase())
+      );
+      this.hasNextPage = end < filteredTickers.length;
+      return filteredTickers.slice(start, end);
+    },
+  },
+  watch: {
+    filter() {
+      this.page = 1;
+
+      window.history.pushState(
+        null,
+        document.title,
+        `${location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
     },
   },
 };
