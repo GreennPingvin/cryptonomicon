@@ -194,7 +194,7 @@ export default {
         const ticker = this.tickers.find(
           (ticker) => ticker.name === tickerName
         );
-        if (ticker) {
+        if (ticker && data.USD) {
           ticker.price =
             data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
           if (this.selected?.name === tickerName) {
