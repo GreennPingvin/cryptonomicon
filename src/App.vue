@@ -99,11 +99,11 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="ticker of filteredTickers()"
+            v-for="ticker of paginatedTickers"
             :key="ticker.name"
             @click="select(ticker)"
             :class="{
-              'border-4': selected === ticker,
+              'border-4': selectedTicker === ticker,
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
@@ -139,20 +139,20 @@
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section v-if="selected" class="relative">
+      <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ selected.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, idx) in normalizeGraph()"
+            v-for="(bar, idx) in normalizedGraph"
             :key="idx"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10"
           ></div>
         </div>
         <button
-          @click="selected = null"
+          @click="selectedTicker = null"
           class="absolute top-0 right-0"
           type="button"
         >
@@ -184,17 +184,19 @@ export default {
   name: "App",
   data() {
     return {
-      spinnerIsShown: true,
       tickerName: "",
-      tickers: [],
-      selected: null,
-      graph: [],
-      intervalIds: new Map(),
-      promptTickerNames: ["BTC", "DOGE", "BCH", "CHD"],
-      warningIsShown: false,
-      page: 1,
       filter: "",
-      hasNextPage: false,
+
+      tickers: [],
+      selectedTicker: null,
+      promptTickerNames: ["BTC", "BTCP", "DOGE", "BCH"],
+      warningIsShown: false,
+      intervalIds: new Map(),
+
+      graph: [],
+      spinnerIsShown: true,
+
+      page: 1,
     };
   },
   created() {
@@ -204,7 +206,6 @@ export default {
     if (windowData.filter) {
       this.filter = windowData.filter;
     }
-
     if (windowData.page) {
       this.page = windowData.page;
     }
@@ -223,6 +224,38 @@ export default {
     this.spinnerIsShown = false;
     console.log(coinList);
   },
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 3;
+    },
+    endIndex() {
+      return this.startIndex + 3;
+    },
+    filteredTickers() {
+      return this.tickers.filter((ticker) =>
+        ticker.name.includes(this.filter.toUpperCase())
+      );
+    },
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+    hasNextPage() {
+      return this.filteredTickers.length > this.endIndex;
+    },
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+      return this.graph.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
+  },
   methods: {
     subscribeToUpdates(tickerName) {
       const intervalId = setInterval(async () => {
@@ -236,7 +269,7 @@ export default {
         if (ticker && data.USD) {
           ticker.price =
             data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-          if (this.selected?.name === tickerName) {
+          if (this.selectedTicker?.name === tickerName) {
             this.graph.push(data.USD);
           }
         }
@@ -259,8 +292,8 @@ export default {
       }
       this.warningIsShown = false;
 
-      this.tickers.push(currentTicker);
-      localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
+      this.tickers = [...this.tickers, currentTicker];
+
       this.subscribeToUpdates(currentTicker.name);
       this.filter = "";
     },
@@ -269,48 +302,40 @@ export default {
         (ticker) => ticker.name !== tickerName
       );
       clearInterval(this.intervalIds.get(tickerName));
-      localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
-    },
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
+
+      if (tickerName === this.selectedTicker?.name) {
+        this.selectedTicker = null;
+      }
     },
     select(ticker) {
-      this.selected = ticker;
+      this.selectedTicker = ticker;
       this.graph = [];
     },
     isTickerNameInList(tickerName) {
       return Boolean(this.tickers.find((ticker) => ticker.name === tickerName));
     },
-    filteredTickers() {
-      const start = (this.page - 1) * 3;
-      const end = start + 3;
-      const filteredTickers = this.tickers.filter((ticker) =>
-        ticker.name.includes(this.filter.toUpperCase())
-      );
-      this.hasNextPage = end < filteredTickers.length;
-      return filteredTickers.slice(start, end);
-    },
   },
   watch: {
     filter() {
       this.page = 1;
-
+    },
+    pageStateOptions(value) {
       window.history.pushState(
         null,
         document.title,
-        `${location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     },
-    page() {
-      window.history.pushState(
-        null,
-        document.title,
-        `${location.pathname}?filter=${this.filter}&page=${this.page}`
-      );
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -= 1;
+      }
+    },
+    selectedTicker() {
+      this.graph = [];
+    },
+    tickers() {
+      localStorage.setItem("TICKERS", JSON.stringify(this.tickers));
     },
   },
 };
