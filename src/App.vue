@@ -1,7 +1,8 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div
-      class="hidden fixed w-100 h-100 bg-purple-800 inset-0 z-50 flex items-center justify-center"
+      v-if="spinnerIsShown"
+      class="fixed w-100 h-100 bg-purple-800 inset-0 z-50 flex items-center justify-center"
     >
       <svg
         class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
@@ -183,6 +184,7 @@ export default {
   name: "App",
   data() {
     return {
+      spinnerIsShown: true,
       tickerName: "",
       tickers: [],
       selected: null,
@@ -213,11 +215,19 @@ export default {
       savedTickers.forEach((ticker) => this.subscribeToUpdates(ticker.name));
     }
   },
+  async mounted() {
+    const f = await fetch(
+      "https://min-api.cryptocompare.com/data/all/coinlist?summary=true"
+    );
+    const { Data: coinList } = await f.json();
+    this.spinnerIsShown = false;
+    console.log(coinList);
+  },
   methods: {
     subscribeToUpdates(tickerName) {
       const intervalId = setInterval(async () => {
         const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=b590b10b9658e433d22b9ab95e234b84cda3c4ed9b0ce21a5577b768d8143620`
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=7784ac0ed1b1ebe26a1dea01a49f5b869768d5a062fc6f6f1987099972bb64da`
         );
         const data = await f.json();
         const ticker = this.tickers.find(
